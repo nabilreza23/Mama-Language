@@ -1,15 +1,13 @@
-Mama keep name = 'Mama Lang'
-Mama keep count = 3
+Mama keep num1 = 15
+Mama keep num2 = 25
+Mama keep sum = num1 + num2
 
-Mama say name
+Mama say 'Calculated Sum:'
+Mama say sum
 
-Mama repeat count times:
-    Mama say 'Running smoothly...'
+Mama take age = 'Give your age: '
 
-Mama check count > 1:
-    Mama say 'Count is greater than 1!'
+Mama check age >= 18:
+    Mama say 'Access Granted, Mama!'
 otherwise:
-    Mama say 'Count is small!'
-
-# Testing AI Guard Trigger
-Mama say Hello without quotes
+    Mama say 'Too young, Mama!'
