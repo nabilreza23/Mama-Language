@@ -1,0 +1,5 @@
+Mama say 'Helper module loaded successfully!'
+
+Mama do greetUser(name):
+    Mama say 'Hello from imported module, '
+    Mama say name
