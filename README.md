@@ -15,7 +15,7 @@ Install Mama Language globally using `pip`:
 pip install mama-lang
 ```
 
-⚡ Quick Start & Interactive REPL
+## ⚡ Quick Start & Interactive REPL
 ​To start the live interactive shell (REPL), simply open your terminal and run:
 ```bash
 mama
