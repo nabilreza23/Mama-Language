@@ -3,6 +3,7 @@ import re
 import os
 import urllib.request
 
+# Global Memory & Scope
 global_scope = {}
 
 class Environment:
@@ -39,10 +40,12 @@ def evaluate_expr(expr, env):
     except ValueError:
         pass
 
+    # Array evaluation
     if expr.startswith('[') and expr.endswith(']'):
         items = expr[1:-1].split(',')
         return [evaluate_expr(item, env) for item in items if item.strip()]
 
+    # Built-in helpers
     len_match = re.match(r"^length\((.*?)\)$", expr, re.IGNORECASE)
     if len_match:
         target = evaluate_expr(len_match.group(1), env)
@@ -78,7 +81,7 @@ def mama_ai_guard(line, line_num, err_details=""):
     elif clean.startswith("mama fetch") and not (clean.endswith("'") or clean.endswith('"')):
         print("💡 Suggestion: Provide URL in quotes, e.g., Mama fetch 'https://api.example.com'")
     else:
-        print(f"💡 Suggestion: Check syntax or module reference. Details: {err_details}")
+        print(f"💡 Suggestion: Check syntax or logic. Details: {err_details}")
 
 def extract_block(lines, start_index):
     block = []
@@ -108,7 +111,7 @@ def run_ast(lines, env):
             continue
 
         try:
-            # 1. Module Import: Mama import 'helper.mama'
+            # 1. Module Import
             import_match = re.match(r"^Mama\s+import\s+(.*)$", line, re.IGNORECASE)
             if import_match:
                 imp_file = evaluate_expr(import_match.group(1).strip(), env)
@@ -121,7 +124,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 2. Web/API Fetch: Mama keep res = Mama fetch 'URL'
+            # 2. Web Data Fetching
             if "mama fetch" in line.lower():
                 target_var = line.split("=")[0].replace("Mama keep", "").strip() if "=" in line else None
                 url_expr = line[line.lower().find("mama fetch") + 10:].strip()
@@ -279,9 +282,24 @@ def run_mama_file(filename):
     except FileNotFoundError:
         print(f"Mama Error: File '{filename}' not found!")
 
+def start_repl():
+    print("🚀 Welcome to Mama Language Interactive Shell (v1.0.0)")
+    print("Type your Mama commands below. Type 'exit' to quit.\n")
+    global_env = Environment()
+    while True:
+        try:
+            line = input("mama > ")
+            if line.strip().lower() in ["exit", "quit"]:
+                break
+            if line.strip():
+                run_ast([line], global_env)
+        except (KeyboardInterrupt, EOFError):
+            print("\nBye Mama!")
+            break
+
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python mama.py <filename.mama>")
+        start_repl()
     else:
         run_mama_file(sys.argv[1])
 
