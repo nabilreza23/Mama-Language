@@ -1,13 +1,29 @@
-Mama keep num1 = 15
-Mama keep num2 = 25
-Mama keep sum = num1 + num2
+# 1. Testing Functions and Scope
+Mama do addNumbers(a, b):
+    Mama keep result = a + b
+    Mama give result
 
-Mama say 'Calculated Sum:'
+Mama keep sum = Mama call addNumbers(20, 30)
+Mama say 'Sum from Function:'
 Mama say sum
 
-Mama take age = 'Give your age: '
+# 2. Testing Lists & Arrays
+Mama keep numbers = [10, 20, 30]
+Mama say 'My List:'
+Mama say numbers
 
-Mama check age >= 18:
-    Mama say 'Access Granted, Mama!'
+# 3. Testing Logic Operators (AND / OR)
+Mama keep age = 22
+Mama keep status = 'active'
+
+Mama check age >= 18 and status == 'active':
+    Mama say 'User is Verified Mama!'
 otherwise:
-    Mama say 'Too young, Mama!'
+    Mama say 'Access Denied!'
+
+# 4. Testing Try-Catch Block
+Mama try:
+    Mama say 'Trying risky action...'
+    Mama keep x = 10 / 0
+Mama catch:
+    Mama say 'Caught an error safely without crashing!'
