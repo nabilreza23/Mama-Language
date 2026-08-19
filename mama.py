@@ -14,10 +14,28 @@ def evaluate_value(val):
         return variables[val]
     return val
 
+def mama_ai_guard(line, line_num):
+    """AI Assistant to analyze syntax mistakes and provide smart suggestions"""
+    print(f"\n[Mama AI Guard Alert on Line {line_num}]")
+    print(f"--> Code: '{line.strip()}'")
+
+    # Suggestion for missing quotes in Mama say
+    if line.strip().lower().startswith("mama say") and not (line.strip().endswith("'") or line.strip().endswith('"')):
+        print("💡 Mama AI Suggestion: Did you forget to wrap your text in quotes? Example: Mama say 'Hello'")
+    # Suggestion for missing colon in check or repeat
+    elif ("mama check" in line.lower() or "mama repeat" in line.lower()) and not line.strip().endswith(":"):
+        print("💡 Mama AI Suggestion: Block statements need a colon ':' at the end. Example: Mama check x > 10:")
+    # Suggestion for typo in Mama keywords
+    elif line.strip().lower().startswith("mama") and not any(k in line.lower() for k in ["say", "keep", "check", "repeat"]):
+        print("💡 Mama AI Suggestion: Unknown Mama command. Valid commands are 'Mama say', 'Mama keep', 'Mama check', and 'Mama repeat'.")
+    else:
+        print("💡 Mama AI Suggestion: Check indentation or verify variable definitions before using them.")
+
 def parse_and_run(lines):
     i = 0
     while i < len(lines):
         line = lines[i].strip()
+        raw_line = lines[i]
         
         # Ignore empty lines and comments
         if not line or line.startswith("#"):
@@ -28,7 +46,11 @@ def parse_and_run(lines):
         say_match = re.match(r"^Mama\s+say\s+(.*)$", line, re.IGNORECASE)
         if say_match:
             content = say_match.group(1).strip()
-            print(evaluate_value(content))
+            # Check for unquoted plain text that isn't a variable
+            if not ((content.startswith("'") and content.endswith("'")) or (content.startswith('"') and content.endswith('"'))) and content not in variables and not content.isdigit():
+                mama_ai_guard(raw_line, i + 1)
+            else:
+                print(evaluate_value(content))
             i += 1
             continue
 
@@ -46,20 +68,18 @@ def parse_and_run(lines):
         if repeat_match:
             times_val = evaluate_value(repeat_match.group(1).strip())
             
-            # Collect block lines
             block_lines = []
             i += 1
             while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
                 block_lines.append(lines[i])
                 i += 1
             
-            # Execute block N times
             try:
                 count = int(times_val)
                 for _ in range(count):
                     parse_and_run(block_lines)
             except ValueError:
-                print(f"Mama Error: Invalid loop count '{times_val}'")
+                mama_ai_guard(raw_line, i)
             continue
 
         # 4. Handle Conditions: Mama check age > 18:
@@ -67,7 +87,6 @@ def parse_and_run(lines):
         if check_match:
             condition_str = check_match.group(1).strip()
             
-            # Substitute variables in condition
             for var in variables:
                 condition_str = re.sub(rf'\b{var}\b', str(repr(variables[var])), condition_str)
             
@@ -78,20 +97,16 @@ def parse_and_run(lines):
 
             i += 1
             if condition_result:
-                # Execute block under Mama check
                 while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
                     parse_and_run([lines[i]])
                     i += 1
-                # Skip otherwise block if present
                 if i < len(lines) and lines[i].strip().lower().startswith("otherwise:"):
                     i += 1
                     while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
                         i += 1
             else:
-                # Skip Mama check block
                 while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
                     i += 1
-                # Execute otherwise block if present
                 if i < len(lines) and lines[i].strip().lower().startswith("otherwise:"):
                     i += 1
                     while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
@@ -99,9 +114,8 @@ def parse_and_run(lines):
                         i += 1
             continue
 
-        # Fallback Error Handling / AI Assistant
-        print(f"Mama Syntax Error: Invalid command -> '{line}'")
-        print("Mama AI Suggestion: Check if you meant 'Mama say', 'Mama keep', 'Mama check', or 'Mama repeat'.")
+        # Fallback to AI Assistant for Syntax Errors
+        mama_ai_guard(raw_line, i + 1)
         i += 1
 
 def run_mama_file(filename):
