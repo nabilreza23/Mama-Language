@@ -1,0 +1,6 @@
+Mama keep name = 'World'
+Mama keep version = 1
+
+Mama say 'Hello Mama Language!'
+Mama say name
+Mama say version
