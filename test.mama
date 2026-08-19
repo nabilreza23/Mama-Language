@@ -1,1 +1,15 @@
-Mama say Hello World without quotes
+Mama keep name = 'Mama Lang'
+Mama keep count = 3
+
+Mama say name
+
+Mama repeat count times:
+    Mama say 'Running smoothly...'
+
+Mama check count > 1:
+    Mama say 'Count is greater than 1!'
+otherwise:
+    Mama say 'Count is small!'
+
+# Testing AI Guard Trigger
+Mama say Hello without quotes
