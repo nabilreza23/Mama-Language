@@ -1,58 +1,90 @@
 import sys
 import re
 
-# Global dictionary to store variables
-variables = {}
+# Global Memory & Scope
+global_scope = {}
 
-def safe_input(prompt=""):
-    """Handles standard input safely for both CLI and GitHub Actions CI"""
-    try:
-        return input(prompt)
-    except EOFError:
-        print(f"{prompt} (CI Auto Input: 20)")
-        return "20"
+class Environment:
+    def __init__(self, parent=None):
+        self.vars = {}
+        self.parent = parent
 
-def evaluate_value(val):
-    val = val.strip()
-    
-    # String literals
-    if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
-        return val[1:-1]
+    def get(self, name):
+        if name in self.vars:
+            return self.vars[name]
+        if self.parent:
+            return self.parent.get(name)
+        return None
+
+    def set(self, name, value):
+        self.vars[name] = value
+
+# Custom Return Exception for Functions
+class ReturnException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+def evaluate_expr(expr, env):
+    expr = expr.strip()
+    if not expr:
+        return None
         
-    # Pure numbers
-    if val.isdigit():
-        return int(val)
+    # Strings
+    if (expr.startswith("'") and expr.endswith("'")) or (expr.startswith('"') and expr.endswith('"')):
+        return expr[1:-1]
+        
+    # Numbers
+    if expr.isdigit():
+        return int(expr)
+    try:
+        return float(expr) if '.' in expr else int(expr)
+    except ValueError:
+        pass
 
-    # Dynamic expression evaluation with variables
-    eval_expr = val
-    for var_name, var_val in list(variables.items()):
-        eval_expr = re.sub(rf'\b{var_name}\b', repr(var_val), eval_expr)
+    # Lists e.g., [1, 2, 'hello']
+    if expr.startswith('[') and expr.endswith(']'):
+        items = expr[1:-1].split(',')
+        return [evaluate_expr(item, env) for item in items if item.strip()]
+
+    # Replace keywords & variables inside expression
+    eval_str = expr
+    # Replace Mama logical operators
+    eval_str = re.sub(r'\band\b', ' and ', eval_str, flags=re.IGNORECASE)
+    eval_str = re.sub(r'\bor\b', ' or ', eval_str, flags=re.IGNORECASE)
+    eval_str = re.sub(r'\bnot\b', ' not ', eval_str, flags=re.IGNORECASE)
+
+    # Variable replacement using current scope
+    tokens = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', eval_str)
+    for token in set(tokens):
+        if token in ['and', 'or', 'not', 'True', 'False', 'None']:
+            continue
+        val = env.get(token)
+        if val is not None:
+            eval_str = re.sub(rf'\b{token}\b', repr(val), eval_str)
 
     try:
-        return eval(eval_expr)
+        return eval(eval_str)
     except Exception:
-        if val in variables:
-            return variables[val]
-        return val
+        val = env.get(expr)
+        return val if val is not None else expr
 
-def mama_ai_guard(line, line_num):
-    """Mama AI Guard for intelligent error diagnosis"""
-    print(f"\n[Mama AI Guard Alert on Line {line_num}]")
+def mama_ai_guard(line, line_num, err_details=""):
+    """Smart AI Assistant for Syntax & Runtime Diagnosis"""
+    print(f"\n🚨 [Mama AI Guard Alert on Line {line_num}]")
     print(f"--> Code: '{line.strip()}'")
+    clean = line.strip().lower()
 
-    clean_line = line.strip().lower()
-    
-    if clean_line.startswith("mama say") and not (clean_line.endswith("'") or clean_line.endswith('"')):
-        print("💡 Mama AI Suggestion: Wrap text in quotes, e.g., Mama say 'Hello'")
-    elif clean_line.startswith("mama take") and "=" not in clean_line:
-        print("💡 Mama AI Suggestion: Correct syntax is -> Mama take age = 'Enter age: '")
-    elif ("mama check" in clean_line or "mama repeat" in clean_line) and not clean_line.endswith(":"):
-        print("💡 Mama AI Suggestion: Missing colon ':' at the end of statement.")
+    if clean.startswith("mama say") and not (clean.endswith("'") or clean.endswith('"')):
+        print("💡 Suggestion: Did you forget quotes or parentheses around the string?")
+    elif ("mama check" in clean or "mama repeat" in clean or "mama do" in clean or "mama try" in clean) and not clean.endswith(":"):
+        print("💡 Suggestion: Block declarations require a colon ':' at the end.")
+    elif "mama call" in clean and "(" not in clean:
+        print("💡 Suggestion: Call functions using parentheses, e.g., Mama call myFunc(arg1)")
     else:
-        print("💡 Mama AI Suggestion: Check syntax or verify if variables are properly defined.")
+        print(f"💡 Suggestion: Check variable scope or syntax error details: {err_details}")
 
 def extract_block(lines, start_index):
-    """Extracts indented code block"""
+    """Extracts indented block supporting multi-level nested scopes"""
     block = []
     i = start_index
     while i < len(lines):
@@ -69,106 +101,141 @@ def extract_block(lines, start_index):
             break
     return block, i
 
-def parse_and_run(lines):
+def run_ast(lines, env):
     i = 0
+    functions = {}
+
     while i < len(lines):
         raw_line = lines[i]
         line = raw_line.strip()
-        
+
         if not line or line.startswith("#") or line.startswith("//"):
             i += 1
             continue
 
-        # 1. User Input: Mama take age = 'Enter your age: '
-        take_match = re.match(r"^Mama\s+take\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*=\s*(.*))?$", line, re.IGNORECASE)
-        if take_match:
-            var_name = take_match.group(1).strip()
-            prompt_msg = take_match.group(2)
-            prompt_str = evaluate_value(prompt_msg) if prompt_msg else ""
-            
-            user_val = safe_input(str(prompt_str))
-            variables[var_name] = evaluate_value(user_val)
-            i += 1
-            continue
-
-        # 2. Output: Mama say 'Hello' or Mama say x + 5
-        say_match = re.match(r"^Mama\s+say\s+(.*)$", line, re.IGNORECASE)
-        if say_match:
-            content = say_match.group(1).strip()
-            try:
-                res = evaluate_value(content)
+        try:
+            # 1. Output Statement: Mama say <expr>
+            if line.lower().startswith("mama say"):
+                content = line[8:].strip()
+                res = evaluate_expr(content, env)
                 print(res)
-            except Exception:
-                mama_ai_guard(raw_line, i + 1)
-            i += 1
-            continue
+                i += 1
+                continue
 
-        # 3. Variable Assignment: Mama keep score = 10 + 20
-        keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
-        if keep_match:
-            var_name = keep_match.group(1).strip()
-            var_value = keep_match.group(2).strip()
-            variables[var_name] = evaluate_value(var_value)
-            i += 1
-            continue
+            # 2. Variable Storage & Lists: Mama keep x = 10 or Mama keep arr = [1, 2]
+            keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
+            if keep_match:
+                var_name = keep_match.group(1).strip()
+                val_expr = keep_match.group(2).strip()
+                env.set(var_name, evaluate_expr(val_expr, env))
+                i += 1
+                continue
 
-        # 4. Loops: Mama repeat 3 times:
-        repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
-        if repeat_match:
-            times_val = evaluate_value(repeat_match.group(1).strip())
-            block_lines, next_i = extract_block(lines, i + 1)
-            
-            try:
-                count = int(times_val)
-                for _ in range(count):
-                    parse_and_run(block_lines)
-            except ValueError:
-                mama_ai_guard(raw_line, i + 1)
+            # 3. Functions Definition: Mama do calculate(a, b):
+            func_match = re.match(r"^Mama\s+do\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)\s*:\s*$", line, re.IGNORECASE)
+            if func_match:
+                func_name = func_match.group(1).strip()
+                params = [p.strip() for p in func_match.group(2).split(',') if p.strip()]
+                block_lines, next_i = extract_block(lines, i + 1)
+                env.set(f"__func_{func_name}__", (params, block_lines))
+                i = next_i
+                continue
+
+            # 4. Function Return: Mama give <expr>
+            if line.lower().startswith("mama give"):
+                ret_val = evaluate_expr(line[9:].strip(), env)
+                raise ReturnException(ret_val)
+
+            # 5. Function Calling: Mama call calculate(10, 20) or Mama keep res = Mama call calculate(10, 20)
+            if "mama call" in line.lower():
+                call_str = line[line.lower().find("mama call") + 9:].strip()
+                c_match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)$", call_str)
+                if c_match:
+                    f_name = c_match.group(1).strip()
+                    args = [evaluate_expr(a.strip(), env) for a in c_match.group(2).split(',') if a.strip()]
+                    func_data = env.get(f"__func_{f_name}__")
+                    
+                    if func_data:
+                        f_params, f_body = func_data
+                        local_env = Environment(parent=env)
+                        for p_name, p_arg in zip(f_params, args):
+                            local_env.set(p_name, p_arg)
+                        try:
+                            run_ast(f_body, local_env)
+                        except ReturnException as ret:
+                            if "=" in line:
+                                target_var = line.split("=")[0].replace("Mama keep", "").strip()
+                                env.set(target_var, ret.value)
+                        i += 1
+                        continue
+
+            # 6. Try-Catch Blocks: Mama try: ... Mama catch:
+            if line.lower().startswith("mama try:"):
+                try_block, next_i = extract_block(lines, i + 1)
+                catch_block = []
+                if next_i < len(lines) and lines[next_i].strip().lower().startswith("mama catch:"):
+                    catch_block, next_i = extract_block(lines, next_i + 1)
                 
-            i = next_i
-            continue
+                try:
+                    run_ast(try_block, env)
+                except Exception as ex:
+                    local_env = Environment(parent=env)
+                    local_env.set("error", str(ex))
+                    run_ast(catch_block, local_env)
 
-        # 5. Conditionals: Mama check age >= 18:
-        check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
-        if check_match:
-            condition_str = check_match.group(1).strip()
-            if_block, next_i = extract_block(lines, i + 1)
-            
-            eval_cond = condition_str
-            for var, val in variables.items():
-                eval_cond = re.sub(rf'\b{var}\b', repr(val), eval_cond)
-            
-            try:
-                condition_result = bool(eval(eval_cond))
-            except Exception:
-                condition_result = False
+                i = next_i
+                continue
 
-            else_block = []
-            if next_i < len(lines) and lines[next_i].strip().lower().startswith("otherwise:"):
-                else_block, next_i = extract_block(lines, next_i + 1)
+            # 7. Loops: Mama repeat 3 times:
+            repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
+            if repeat_match:
+                times_val = int(evaluate_expr(repeat_match.group(1).strip(), env))
+                block_lines, next_i = extract_block(lines, i + 1)
+                for _ in range(times_val):
+                    run_ast(block_lines, env)
+                i = next_i
+                continue
 
-            if condition_result:
-                parse_and_run(if_block)
-            else:
-                parse_and_run(else_block)
+            # 8. Conditionals (with AND / OR): Mama check age >= 18 and status == 'ok':
+            check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
+            if check_match:
+                cond_expr = check_match.group(1).strip()
+                if_block, next_i = extract_block(lines, i + 1)
+                else_block = []
+                
+                if next_i < len(lines) and lines[next_i].strip().lower().startswith("otherwise:"):
+                    else_block, next_i = extract_block(lines, next_i + 1)
 
-            i = next_i
-            continue
+                if bool(evaluate_expr(cond_expr, env)):
+                    run_ast(if_block, env)
+                else:
+                    run_ast(else_block, env)
 
-        mama_ai_guard(raw_line, i + 1)
-        i += 1
+                i = next_i
+                continue
+
+            # Fallback Syntax Guard
+            mama_ai_guard(raw_line, i + 1)
+            i += 1
+
+        except ReturnException as r:
+            raise r
+        except Exception as e:
+            mama_ai_guard(raw_line, i + 1, str(e))
+            i += 1
 
 def run_mama_file(filename):
     try:
         with open(filename, 'r') as file:
             lines = file.readlines()
-            parse_and_run(lines)
+            global_env = Environment()
+            run_ast(lines, global_env)
     except FileNotFoundError:
         print(f"Mama Error: File '{filename}' not found!")
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: mama <filename.mama>")
+        print("Usage: python mama.py <filename.mama>")
     else:
         run_mama_file(sys.argv[1])
 
