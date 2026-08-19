@@ -4,52 +4,90 @@ import re
 # Dictionary to store variables created by 'Mama keep'
 variables = {}
 
-def parse_and_run(line):
-    line = line.strip()
-    
-    # Ignore empty lines and comments
-    if not line or line.startswith("#"):
-        return
+def evaluate_value(val):
+    val = val.strip()
+    if val.isdigit():
+        return int(val)
+    if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
+        return val[1:-1]
+    if val in variables:
+        return variables[val]
+    return val
 
-    # 1. Handle Output: Mama say 'Text' or Mama say variable_name
-    say_match = re.match(r"^Mama\s+say\s+(.*)$", line, re.IGNORECASE)
-    if say_match:
-        content = say_match.group(1).strip()
+def parse_and_run(lines):
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
         
-        # Check if the content is wrapped in single or double quotes (String)
-        if (content.startswith("'") and content.endswith("'")) or (content.startswith('"') and content.endswith('"')):
-            print(content[1:-1])
-        # Check if it's a stored variable name
-        elif content in variables:
-            print(variables[content])
-        else:
-            print(f"Mama AI Suggestion: Variable '{content}' is not defined. Did you forget quotes or definition?")
-        return
+        # Ignore empty lines and comments
+        if not line or line.startswith("#"):
+            i += 1
+            continue
 
-    # 2. Handle Variables: Mama keep variable_name = value
-    keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
-    if keep_match:
-        var_name = keep_match.group(1).strip()
-        var_value = keep_match.group(2).strip()
-        
-        # Evaluate integer or remove quotes for string
-        if var_value.isdigit():
-            variables[var_name] = int(var_value)
-        elif (var_value.startswith("'") and var_value.endswith("'")) or (var_value.startswith('"') and var_value.endswith('"')):
-            variables[var_name] = var_value[1:-1]
-        else:
-            variables[var_name] = var_value
-        return
+        # 1. Handle Output: Mama say 'Text' or Mama say variable_name
+        say_match = re.match(r"^Mama\s+say\s+(.*)$", line, re.IGNORECASE)
+        if say_match:
+            content = say_match.group(1).strip()
+            print(evaluate_value(content))
+            i += 1
+            continue
 
-    # Fallback Error Handling
-    print(f"Mama Syntax Error: Invalid command -> '{line}'")
-    print("Mama AI Suggestion: Check if you meant 'Mama say' or 'Mama keep'.")
+        # 2. Handle Variables: Mama keep variable_name = value
+        keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
+        if keep_match:
+            var_name = keep_match.group(1).strip()
+            var_value = keep_match.group(2).strip()
+            variables[var_name] = evaluate_value(var_value)
+            i += 1
+            continue
+
+        # 3. Handle Conditions: Mama check age > 18:
+        check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
+        if check_match:
+            condition_str = check_match.group(1).strip()
+            
+            # Substitute variables in condition
+            for var in variables:
+                condition_str = re.sub(rf'\b{var}\b', str(repr(variables[var])), condition_str)
+            
+            try:
+                condition_result = eval(condition_str)
+            except Exception:
+                condition_result = False
+
+            i += 1
+            if condition_result:
+                # Execute block under Mama check
+                while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
+                    parse_and_run([lines[i]])
+                    i += 1
+                # Skip otherwise block if present
+                if i < len(lines) and lines[i].strip().lower().startswith("otherwise:"):
+                    i += 1
+                    while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
+                        i += 1
+            else:
+                # Skip Mama check block
+                while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
+                    i += 1
+                # Execute otherwise block if present
+                if i < len(lines) and lines[i].strip().lower().startswith("otherwise:"):
+                    i += 1
+                    while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
+                        parse_and_run([lines[i]])
+                        i += 1
+            continue
+
+        # Fallback Error Handling / AI Assistant
+        print(f"Mama Syntax Error: Invalid command -> '{line}'")
+        print("Mama AI Suggestion: Check if you meant 'Mama say', 'Mama keep', or 'Mama check'.")
+        i += 1
 
 def run_mama_file(filename):
     try:
         with open(filename, 'r') as file:
-            for line in file:
-                parse_and_run(line)
+            lines = file.readlines()
+            parse_and_run(lines)
     except FileNotFoundError:
         print(f"Mama Error: File '{filename}' not found!")
 
