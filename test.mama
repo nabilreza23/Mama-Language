@@ -1,29 +1,15 @@
-# 1. Testing Functions and Scope
-Mama do addNumbers(a, b):
-    Mama keep result = a + b
-    Mama give result
+# 1. Test Array For-Each Loop & Length Helper
+Mama keep fruits = ['Apple', 'Banana', 'Mango']
+Mama say 'Total Fruits Count:'
+Mama say length(fruits)
 
-Mama keep sum = Mama call addNumbers(20, 30)
-Mama say 'Sum from Function:'
-Mama say sum
+Mama say 'Looping through items:'
+Mama repeat item in fruits:
+    Mama say item
 
-# 2. Testing Lists & Arrays
-Mama keep numbers = [10, 20, 30]
-Mama say 'My List:'
-Mama say numbers
+# 2. Test File Operations (Write & Read)
+Mama write 'note.txt' = 'Mama Language File I/O works!'
+Mama keep file_content = Mama read 'note.txt'
 
-# 3. Testing Logic Operators (AND / OR)
-Mama keep age = 22
-Mama keep status = 'active'
-
-Mama check age >= 18 and status == 'active':
-    Mama say 'User is Verified Mama!'
-otherwise:
-    Mama say 'Access Denied!'
-
-# 4. Testing Try-Catch Block
-Mama try:
-    Mama say 'Trying risky action...'
-    Mama keep x = 10 / 0
-Mama catch:
-    Mama say 'Caught an error safely without crashing!'
+Mama say 'Content read from file:'
+Mama say file_content
