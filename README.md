@@ -33,3 +33,19 @@ mama script.mama
 Mama say 'Hello World!'
 Mama say 100 + 50
 ```
+**2. Variables & Constants (Mama keep)**
+```bash
+Mama keep name = 'Nabil'
+Mama keep age = 22
+Mama keep fruits = ['Apple', 'Banana', 'Mango']
+```
+
+**3. Conditionals & Logic (Mama check / otherwise)**
+```bash
+Mama check age >= 18 and status == 'active':
+    Mama say 'Access Granted!'
+otherwise:
+    Mama say 'Access Denied!'
+```
+
+
