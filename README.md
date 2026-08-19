@@ -6,16 +6,14 @@
 
 Designed to make coding fun, highly relatable, and accessible for everyone!
 
-[![PyPI Version](https://img.shields.io/pypi/v/mama-lang.svg?style=for-the-badge&color=ff69b4)](https://pypi.org/project/mama-lang/)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/nabilreza23/Mama-Language/test-mama.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/nabilreza23/Mama-Language/actions)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/mama-lang?style=for-the-badge&color=blue)](https://pypi.org/project/mama-lang/)
-[![Python Version](https://img.shields.io/pypi/pyversions/mama-lang?style=for-the-badge&logo=python&logoColor=white)](https://pypi.org/project/mama-lang/)
+[![PyPI Version](https://img.shields.io/pypi/v/mama-lang?style=for-the-badge&color=ff69b4)](https://pypi.org/project/mama-lang/)
+[![GitHub Release](https://img.shields.io/github/v/release/nabilreza23/Mama-Language?style=for-the-badge&color=blue)](https://github.com/nabilreza23/Mama-Language/releases)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 ---
 
 </div>
-
 
 
 
