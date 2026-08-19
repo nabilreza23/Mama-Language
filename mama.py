@@ -41,7 +41,28 @@ def parse_and_run(lines):
             i += 1
             continue
 
-        # 3. Handle Conditions: Mama check age > 18:
+        # 3. Handle Loops: Mama repeat 5 times:
+        repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
+        if repeat_match:
+            times_val = evaluate_value(repeat_match.group(1).strip())
+            
+            # Collect block lines
+            block_lines = []
+            i += 1
+            while i < len(lines) and (lines[i].startswith("    ") or lines[i].startswith("\t")):
+                block_lines.append(lines[i])
+                i += 1
+            
+            # Execute block N times
+            try:
+                count = int(times_val)
+                for _ in range(count):
+                    parse_and_run(block_lines)
+            except ValueError:
+                print(f"Mama Error: Invalid loop count '{times_val}'")
+            continue
+
+        # 4. Handle Conditions: Mama check age > 18:
         check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
         if check_match:
             condition_str = check_match.group(1).strip()
@@ -80,7 +101,7 @@ def parse_and_run(lines):
 
         # Fallback Error Handling / AI Assistant
         print(f"Mama Syntax Error: Invalid command -> '{line}'")
-        print("Mama AI Suggestion: Check if you meant 'Mama say', 'Mama keep', or 'Mama check'.")
+        print("Mama AI Suggestion: Check if you meant 'Mama say', 'Mama keep', 'Mama check', or 'Mama repeat'.")
         i += 1
 
 def run_mama_file(filename):
