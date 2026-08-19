@@ -1,7 +1,7 @@
 import sys
 import re
+import os
 
-# Global Memory & Scope
 global_scope = {}
 
 class Environment:
@@ -19,21 +19,18 @@ class Environment:
     def set(self, name, value):
         self.vars[name] = value
 
-# Custom Return Exception for Functions
 class ReturnException(Exception):
     def __init__(self, value):
         self.value = value
 
 def evaluate_expr(expr, env):
-    expr = expr.strip()
+    expr = str(expr).strip()
     if not expr:
         return None
         
-    # Strings
     if (expr.startswith("'") and expr.endswith("'")) or (expr.startswith('"') and expr.endswith('"')):
         return expr[1:-1]
         
-    # Numbers
     if expr.isdigit():
         return int(expr)
     try:
@@ -41,19 +38,23 @@ def evaluate_expr(expr, env):
     except ValueError:
         pass
 
-    # Lists e.g., [1, 2, 'hello']
+    # Array evaluation
     if expr.startswith('[') and expr.endswith(']'):
         items = expr[1:-1].split(',')
         return [evaluate_expr(item, env) for item in items if item.strip()]
 
-    # Replace keywords & variables inside expression
+    # Built-in helper: length check e.g. length(my_list)
+    len_match = re.match(r"^length\((.*?)\)$", expr, re.IGNORECASE)
+    if len_match:
+        target = evaluate_expr(len_match.group(1), env)
+        if isinstance(target, (list, str)):
+            return len(target)
+        return 0
+
     eval_str = expr
-    # Replace Mama logical operators
     eval_str = re.sub(r'\band\b', ' and ', eval_str, flags=re.IGNORECASE)
     eval_str = re.sub(r'\bor\b', ' or ', eval_str, flags=re.IGNORECASE)
-    eval_str = re.sub(r'\bnot\b', ' not ', eval_str, flags=re.IGNORECASE)
 
-    # Variable replacement using current scope
     tokens = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', eval_str)
     for token in set(tokens):
         if token in ['and', 'or', 'not', 'True', 'False', 'None']:
@@ -69,22 +70,19 @@ def evaluate_expr(expr, env):
         return val if val is not None else expr
 
 def mama_ai_guard(line, line_num, err_details=""):
-    """Smart AI Assistant for Syntax & Runtime Diagnosis"""
+    """Mama AI Smart Assistant"""
     print(f"\n🚨 [Mama AI Guard Alert on Line {line_num}]")
     print(f"--> Code: '{line.strip()}'")
     clean = line.strip().lower()
 
-    if clean.startswith("mama say") and not (clean.endswith("'") or clean.endswith('"')):
-        print("💡 Suggestion: Did you forget quotes or parentheses around the string?")
-    elif ("mama check" in clean or "mama repeat" in clean or "mama do" in clean or "mama try" in clean) and not clean.endswith(":"):
-        print("💡 Suggestion: Block declarations require a colon ':' at the end.")
-    elif "mama call" in clean and "(" not in clean:
-        print("💡 Suggestion: Call functions using parentheses, e.g., Mama call myFunc(arg1)")
+    if clean.startswith("mama write") and "=" not in clean:
+        print("💡 Suggestion: Use format -> Mama write 'filename.txt' = 'content'")
+    elif clean.startswith("mama read") and not clean.endswith("'") and not clean.endswith('"'):
+        print("💡 Suggestion: Pass filename in quotes -> Mama keep text = Mama read 'file.txt'")
     else:
-        print(f"💡 Suggestion: Check variable scope or syntax error details: {err_details}")
+        print(f"💡 Suggestion: Check logic/syntax. Details: {err_details}")
 
 def extract_block(lines, start_index):
-    """Extracts indented block supporting multi-level nested scopes"""
     block = []
     i = start_index
     while i < len(lines):
@@ -103,8 +101,6 @@ def extract_block(lines, start_index):
 
 def run_ast(lines, env):
     i = 0
-    functions = {}
-
     while i < len(lines):
         raw_line = lines[i]
         line = raw_line.strip()
@@ -114,7 +110,7 @@ def run_ast(lines, env):
             continue
 
         try:
-            # 1. Output Statement: Mama say <expr>
+            # Output
             if line.lower().startswith("mama say"):
                 content = line[8:].strip()
                 res = evaluate_expr(content, env)
@@ -122,7 +118,59 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 2. Variable Storage & Lists: Mama keep x = 10 or Mama keep arr = [1, 2]
+            # File Write: Mama write 'filename.txt' = 'content'
+            write_match = re.match(r"^Mama\s+write\s+(.*?)\s*=\s*(.*)$", line, re.IGNORECASE)
+            if write_match:
+                fname = evaluate_expr(write_match.group(1).strip(), env)
+                content = evaluate_expr(write_match.group(2).strip(), env)
+                with open(str(fname), 'w') as f:
+                    f.write(str(content))
+                i += 1
+                continue
+
+            # File Read & Storage: Mama keep content = Mama read 'filename.txt'
+            if "mama read" in line.lower():
+                target_var = line.split("=")[0].replace("Mama keep", "").strip() if "=" in line else None
+                fname_expr = line[line.lower().find("mama read") + 9:].strip()
+                fname = evaluate_expr(fname_expr, env)
+                if os.path.exists(str(fname)):
+                    with open(str(fname), 'r') as f:
+                        file_data = f.read()
+                    if target_var:
+                        env.set(target_var, file_data)
+                    else:
+                        print(file_data)
+                else:
+                    print(f"Mama Error: File '{fname}' not found!")
+                i += 1
+                continue
+
+            # For-Each Loop over Array: Mama repeat item in list_var:
+            foreach_match = re.match(r"^Mama\s+repeat\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
+            if foreach_match:
+                item_var = foreach_match.group(1).strip()
+                list_target = evaluate_expr(foreach_match.group(2).strip(), env)
+                block_lines, next_i = extract_block(lines, i + 1)
+
+                if isinstance(list_target, list):
+                    for val in list_target:
+                        local_env = Environment(parent=env)
+                        local_env.set(item_var, val)
+                        run_ast(block_lines, local_env)
+                i = next_i
+                continue
+
+            # Count Loop: Mama repeat 3 times:
+            repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
+            if repeat_match:
+                times_val = int(evaluate_expr(repeat_match.group(1).strip(), env))
+                block_lines, next_i = extract_block(lines, i + 1)
+                for _ in range(times_val):
+                    run_ast(block_lines, env)
+                i = next_i
+                continue
+
+            # Variable Storage
             keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
             if keep_match:
                 var_name = keep_match.group(1).strip()
@@ -131,7 +179,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 3. Functions Definition: Mama do calculate(a, b):
+            # Functions Definition & Execution
             func_match = re.match(r"^Mama\s+do\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)\s*:\s*$", line, re.IGNORECASE)
             if func_match:
                 func_name = func_match.group(1).strip()
@@ -141,12 +189,10 @@ def run_ast(lines, env):
                 i = next_i
                 continue
 
-            # 4. Function Return: Mama give <expr>
             if line.lower().startswith("mama give"):
                 ret_val = evaluate_expr(line[9:].strip(), env)
                 raise ReturnException(ret_val)
 
-            # 5. Function Calling: Mama call calculate(10, 20) or Mama keep res = Mama call calculate(10, 20)
             if "mama call" in line.lower():
                 call_str = line[line.lower().find("mama call") + 9:].strip()
                 c_match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)$", call_str)
@@ -169,34 +215,7 @@ def run_ast(lines, env):
                         i += 1
                         continue
 
-            # 6. Try-Catch Blocks: Mama try: ... Mama catch:
-            if line.lower().startswith("mama try:"):
-                try_block, next_i = extract_block(lines, i + 1)
-                catch_block = []
-                if next_i < len(lines) and lines[next_i].strip().lower().startswith("mama catch:"):
-                    catch_block, next_i = extract_block(lines, next_i + 1)
-                
-                try:
-                    run_ast(try_block, env)
-                except Exception as ex:
-                    local_env = Environment(parent=env)
-                    local_env.set("error", str(ex))
-                    run_ast(catch_block, local_env)
-
-                i = next_i
-                continue
-
-            # 7. Loops: Mama repeat 3 times:
-            repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
-            if repeat_match:
-                times_val = int(evaluate_expr(repeat_match.group(1).strip(), env))
-                block_lines, next_i = extract_block(lines, i + 1)
-                for _ in range(times_val):
-                    run_ast(block_lines, env)
-                i = next_i
-                continue
-
-            # 8. Conditionals (with AND / OR): Mama check age >= 18 and status == 'ok':
+            # Conditionals
             check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if check_match:
                 cond_expr = check_match.group(1).strip()
@@ -214,7 +233,6 @@ def run_ast(lines, env):
                 i = next_i
                 continue
 
-            # Fallback Syntax Guard
             mama_ai_guard(raw_line, i + 1)
             i += 1
 
