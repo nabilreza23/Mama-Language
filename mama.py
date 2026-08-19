@@ -4,21 +4,28 @@ import re
 # Global dictionary to store variables
 variables = {}
 
+def safe_input(prompt=""):
+    """Handles standard input safely for both CLI and GitHub Actions CI"""
+    try:
+        return input(prompt)
+    except EOFError:
+        print(f"{prompt} (CI Auto Input: 20)")
+        return "20"
+
 def evaluate_value(val):
     val = val.strip()
     
-    # Check string literals
+    # String literals
     if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
         return val[1:-1]
         
-    # Check digits directly
+    # Pure numbers
     if val.isdigit():
         return int(val)
 
-    # Evaluate dynamic expression with variable substitution
+    # Dynamic expression evaluation with variables
     eval_expr = val
-    for var_name, var_val in variables.items():
-        # Replace variable with its representation
+    for var_name, var_val in list(variables.items()):
         eval_expr = re.sub(rf'\b{var_name}\b', repr(var_val), eval_expr)
 
     try:
@@ -29,30 +36,28 @@ def evaluate_value(val):
         return val
 
 def mama_ai_guard(line, line_num):
-    """Mama AI Assistant to detect syntax issues and recommend fixes"""
+    """Mama AI Guard for intelligent error diagnosis"""
     print(f"\n[Mama AI Guard Alert on Line {line_num}]")
     print(f"--> Code: '{line.strip()}'")
 
     clean_line = line.strip().lower()
     
     if clean_line.startswith("mama say") and not (clean_line.endswith("'") or clean_line.endswith('"')):
-        print("💡 Mama AI Suggestion: Did you forget to wrap string in quotes? Example: Mama say 'Hello'")
+        print("💡 Mama AI Suggestion: Wrap text in quotes, e.g., Mama say 'Hello'")
+    elif clean_line.startswith("mama take") and "=" not in clean_line:
+        print("💡 Mama AI Suggestion: Correct syntax is -> Mama take age = 'Enter age: '")
     elif ("mama check" in clean_line or "mama repeat" in clean_line) and not clean_line.endswith(":"):
-        print("💡 Mama AI Suggestion: Block statements need a colon ':' at the end. Example: Mama check x > 10:")
-    elif clean_line.startswith("mama") and not any(k in clean_line for k in ["say", "keep", "check", "repeat"]):
-        print("💡 Mama AI Suggestion: Unknown command. Supported commands: 'Mama say', 'Mama keep', 'Mama check', 'Mama repeat'.")
+        print("💡 Mama AI Suggestion: Missing colon ':' at the end of statement.")
     else:
-        print("💡 Mama AI Suggestion: Check indentation or verify if the variable is defined.")
+        print("💡 Mama AI Suggestion: Check syntax or verify if variables are properly defined.")
 
 def extract_block(lines, start_index):
-    """Extract indented block belonging to a control structure"""
+    """Extracts indented code block"""
     block = []
     i = start_index
     while i < len(lines):
         line = lines[i]
-        # Empty lines or lines with indentation belong to the block
         if not line.strip() or line.startswith("    ") or line.startswith("\t"):
-            # Strip 4 spaces or 1 tab of outer indentation level
             if line.startswith("    "):
                 block.append(line[4:])
             elif line.startswith("\t"):
@@ -70,16 +75,26 @@ def parse_and_run(lines):
         raw_line = lines[i]
         line = raw_line.strip()
         
-        # Ignore empty lines and comments
         if not line or line.startswith("#") or line.startswith("//"):
             i += 1
             continue
 
-        # 1. Output: Mama say 'Text' or Mama say variable
+        # 1. User Input: Mama take age = 'Enter your age: '
+        take_match = re.match(r"^Mama\s+take\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*=\s*(.*))?$", line, re.IGNORECASE)
+        if take_match:
+            var_name = take_match.group(1).strip()
+            prompt_msg = take_match.group(2)
+            prompt_str = evaluate_value(prompt_msg) if prompt_msg else ""
+            
+            user_val = safe_input(str(prompt_str))
+            variables[var_name] = evaluate_value(user_val)
+            i += 1
+            continue
+
+        # 2. Output: Mama say 'Hello' or Mama say x + 5
         say_match = re.match(r"^Mama\s+say\s+(.*)$", line, re.IGNORECASE)
         if say_match:
             content = say_match.group(1).strip()
-            # If not string, not digit, and not valid expr/var, invoke AI guard
             try:
                 res = evaluate_value(content)
                 print(res)
@@ -88,7 +103,7 @@ def parse_and_run(lines):
             i += 1
             continue
 
-        # 2. Variable Assignment: Mama keep x = 10
+        # 3. Variable Assignment: Mama keep score = 10 + 20
         keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
         if keep_match:
             var_name = keep_match.group(1).strip()
@@ -97,7 +112,7 @@ def parse_and_run(lines):
             i += 1
             continue
 
-        # 3. Loops: Mama repeat 3 times:
+        # 4. Loops: Mama repeat 3 times:
         repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
         if repeat_match:
             times_val = evaluate_value(repeat_match.group(1).strip())
@@ -113,13 +128,12 @@ def parse_and_run(lines):
             i = next_i
             continue
 
-        # 4. Conditionals: Mama check x > 5:
+        # 5. Conditionals: Mama check age >= 18:
         check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
         if check_match:
             condition_str = check_match.group(1).strip()
             if_block, next_i = extract_block(lines, i + 1)
             
-            # Evaluate condition
             eval_cond = condition_str
             for var, val in variables.items():
                 eval_cond = re.sub(rf'\b{var}\b', repr(val), eval_cond)
@@ -130,7 +144,6 @@ def parse_and_run(lines):
                 condition_result = False
 
             else_block = []
-            # Check for 'otherwise:' block right after 'check' block
             if next_i < len(lines) and lines[next_i].strip().lower().startswith("otherwise:"):
                 else_block, next_i = extract_block(lines, next_i + 1)
 
@@ -142,7 +155,6 @@ def parse_and_run(lines):
             i = next_i
             continue
 
-        # Syntax Error Fallback
         mama_ai_guard(raw_line, i + 1)
         i += 1
 
@@ -154,8 +166,11 @@ def run_mama_file(filename):
     except FileNotFoundError:
         print(f"Mama Error: File '{filename}' not found!")
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 2:
-        print("Usage: python mama.py <filename.mama>")
+        print("Usage: mama <filename.mama>")
     else:
         run_mama_file(sys.argv[1])
+
+if __name__ == "__main__":
+    main()
