@@ -1,6 +1,5 @@
-Mama keep age = 20
+Mama keep count = 3
 
-Mama check age > 18:
-    Mama say 'Access Granted, Mama!'
-otherwise:
-    Mama say 'Too young, bro!'
+Mama say 'Loop test starts:'
+Mama repeat count times:
+    Mama say 'Mama language is awesome!'
