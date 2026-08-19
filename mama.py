@@ -1,6 +1,7 @@
 import sys
 import re
 import os
+import urllib.request
 
 global_scope = {}
 
@@ -38,12 +39,10 @@ def evaluate_expr(expr, env):
     except ValueError:
         pass
 
-    # Array evaluation
     if expr.startswith('[') and expr.endswith(']'):
         items = expr[1:-1].split(',')
         return [evaluate_expr(item, env) for item in items if item.strip()]
 
-    # Built-in helper: length check e.g. length(my_list)
     len_match = re.match(r"^length\((.*?)\)$", expr, re.IGNORECASE)
     if len_match:
         target = evaluate_expr(len_match.group(1), env)
@@ -70,17 +69,16 @@ def evaluate_expr(expr, env):
         return val if val is not None else expr
 
 def mama_ai_guard(line, line_num, err_details=""):
-    """Mama AI Smart Assistant"""
     print(f"\n🚨 [Mama AI Guard Alert on Line {line_num}]")
     print(f"--> Code: '{line.strip()}'")
     clean = line.strip().lower()
 
-    if clean.startswith("mama write") and "=" not in clean:
-        print("💡 Suggestion: Use format -> Mama write 'filename.txt' = 'content'")
-    elif clean.startswith("mama read") and not clean.endswith("'") and not clean.endswith('"'):
-        print("💡 Suggestion: Pass filename in quotes -> Mama keep text = Mama read 'file.txt'")
+    if clean.startswith("mama import") and not (clean.endswith("'") or clean.endswith('"')):
+        print("💡 Suggestion: Provide file name in quotes, e.g., Mama import 'helper.mama'")
+    elif clean.startswith("mama fetch") and not (clean.endswith("'") or clean.endswith('"')):
+        print("💡 Suggestion: Provide URL in quotes, e.g., Mama fetch 'https://api.example.com'")
     else:
-        print(f"💡 Suggestion: Check logic/syntax. Details: {err_details}")
+        print(f"💡 Suggestion: Check syntax or module reference. Details: {err_details}")
 
 def extract_block(lines, start_index):
     block = []
@@ -110,7 +108,39 @@ def run_ast(lines, env):
             continue
 
         try:
-            # Output
+            # 1. Module Import: Mama import 'helper.mama'
+            import_match = re.match(r"^Mama\s+import\s+(.*)$", line, re.IGNORECASE)
+            if import_match:
+                imp_file = evaluate_expr(import_match.group(1).strip(), env)
+                if os.path.exists(str(imp_file)):
+                    with open(str(imp_file), 'r') as f:
+                        imp_lines = f.readlines()
+                    run_ast(imp_lines, env)
+                else:
+                    print(f"Mama Error: File '{imp_file}' not found for import!")
+                i += 1
+                continue
+
+            # 2. Web/API Fetch: Mama keep res = Mama fetch 'URL'
+            if "mama fetch" in line.lower():
+                target_var = line.split("=")[0].replace("Mama keep", "").strip() if "=" in line else None
+                url_expr = line[line.lower().find("mama fetch") + 10:].strip()
+                url_val = str(evaluate_expr(url_expr, env))
+                
+                try:
+                    req = urllib.request.Request(url_val, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req) as response:
+                        web_data = response.read().decode('utf-8')
+                    if target_var:
+                        env.set(target_var, web_data)
+                    else:
+                        print(web_data)
+                except Exception as net_err:
+                    print(f"Mama Fetch Error: {net_err}")
+                i += 1
+                continue
+
+            # 3. Output
             if line.lower().startswith("mama say"):
                 content = line[8:].strip()
                 res = evaluate_expr(content, env)
@@ -118,7 +148,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # File Write: Mama write 'filename.txt' = 'content'
+            # 4. File Operations
             write_match = re.match(r"^Mama\s+write\s+(.*?)\s*=\s*(.*)$", line, re.IGNORECASE)
             if write_match:
                 fname = evaluate_expr(write_match.group(1).strip(), env)
@@ -128,7 +158,6 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # File Read & Storage: Mama keep content = Mama read 'filename.txt'
             if "mama read" in line.lower():
                 target_var = line.split("=")[0].replace("Mama keep", "").strip() if "=" in line else None
                 fname_expr = line[line.lower().find("mama read") + 9:].strip()
@@ -145,7 +174,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # For-Each Loop over Array: Mama repeat item in list_var:
+            # 5. Loops
             foreach_match = re.match(r"^Mama\s+repeat\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if foreach_match:
                 item_var = foreach_match.group(1).strip()
@@ -160,7 +189,6 @@ def run_ast(lines, env):
                 i = next_i
                 continue
 
-            # Count Loop: Mama repeat 3 times:
             repeat_match = re.match(r"^Mama\s+repeat\s+(.*?)\s+times\s*:\s*$", line, re.IGNORECASE)
             if repeat_match:
                 times_val = int(evaluate_expr(repeat_match.group(1).strip(), env))
@@ -170,7 +198,7 @@ def run_ast(lines, env):
                 i = next_i
                 continue
 
-            # Variable Storage
+            # 6. Variable Storage
             keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
             if keep_match:
                 var_name = keep_match.group(1).strip()
@@ -179,7 +207,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # Functions Definition & Execution
+            # 7. Functions
             func_match = re.match(r"^Mama\s+do\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)\s*:\s*$", line, re.IGNORECASE)
             if func_match:
                 func_name = func_match.group(1).strip()
@@ -215,7 +243,7 @@ def run_ast(lines, env):
                         i += 1
                         continue
 
-            # Conditionals
+            # 8. Conditionals
             check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if check_match:
                 cond_expr = check_match.group(1).strip()
