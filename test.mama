@@ -1,15 +1,7 @@
-# 1. Test Array For-Each Loop & Length Helper
-Mama keep fruits = ['Apple', 'Banana', 'Mango']
-Mama say 'Total Fruits Count:'
-Mama say length(fruits)
+# 1. Test Module Import
+Mama import 'helper.mama'
+Mama call greetUser('Nabil')
 
-Mama say 'Looping through items:'
-Mama repeat item in fruits:
-    Mama say item
-
-# 2. Test File Operations (Write & Read)
-Mama write 'note.txt' = 'Mama Language File I/O works!'
-Mama keep file_content = Mama read 'note.txt'
-
-Mama say 'Content read from file:'
-Mama say file_content
+# 2. Test Fetching Data from Web
+Mama keep api_data = Mama fetch 'https://api.github.com'
+Mama say 'API Response Received!'
