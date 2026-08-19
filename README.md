@@ -21,6 +21,15 @@ pip install mama-lang
 mama
 ```
 
+#### To execute a .mama source file:
+```bash
+mama script.mama
+```
 
 
-
+## 📜 Syntax & Features
+**​1. Printing Output (Mama say)**
+```bash
+Mama say 'Hello World!'
+Mama say 100 + 50
+```
