@@ -48,4 +48,34 @@ otherwise:
     Mama say 'Access Denied!'
 ```
 
+**4. Loops (Mama repeat)**
+```bash
+# Fixed iteration loop
+Mama repeat 3 times:
+    Mama say 'Looping...'
+```
+```bash
+# Array For-Each loop
+Mama repeat item in fruits:
+    Mama say item
+```
+
+
+**5. Functions & Return (Mama do / Mama give / Mama call)**
+```bash
+Mama do addNumbers(a, b):
+    Mama keep total = a + b
+    Mama give total
+
+Mama keep result = Mama call addNumbers(10, 20)
+Mama say result
+```
+
+**6. Error Handling (Mama try / Mama catch)**
+```bash
+Mama try:
+    Mama keep x = 10 / 0
+Mama catch:
+    Mama say 'Safely handled division by zero!'
+```
 
