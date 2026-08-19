@@ -1,6 +1,6 @@
-Mama keep name = 'World'
-Mama keep version = 1
+Mama keep age = 20
 
-Mama say 'Hello Mama Language!'
-Mama say name
-Mama say version
+Mama check age > 18:
+    Mama say 'Access Granted, Mama!'
+otherwise:
+    Mama say 'Too young, bro!'
