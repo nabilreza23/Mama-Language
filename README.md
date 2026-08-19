@@ -79,3 +79,21 @@ Mama catch:
     Mama say 'Safely handled division by zero!'
 ```
 
+**7. File Operations (Mama write / Mama read)**
+```bash
+Mama write 'data.txt' = 'Mama Language File System'
+Mama keep content = Mama read 'data.txt'
+Mama say content
+```
+
+**8. Web Data Fetching (Mama fetch)**
+```bash
+Mama keep response = Mama fetch '[https://api.github.com](https://api.github.com)'
+Mama say response
+```
+
+**9. Module Import (Mama import)**
+```bash
+Mama import 'helper.mama'
+Mama call helperFunction()
+```
