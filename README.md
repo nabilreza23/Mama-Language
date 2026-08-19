@@ -97,3 +97,13 @@ Mama say response
 Mama import 'helper.mama'
 Mama call helperFunction()
 ```
+
+
+## 🛠️ Built-in Helpers
+​length(list_or_string) : Returns the total number of items or length.
+​
+## 🤝 Contributing
+​Feel free to open issues or pull requests on GitHub.
+​
+## 📄 License
+​This project is licensed under the MIT License.
