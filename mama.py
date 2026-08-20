@@ -3,7 +3,8 @@ import re
 import os
 import urllib.request
 
-# Global Memory & Scope
+VERSION = "1.0.1"
+
 global_scope = {}
 
 class Environment:
@@ -40,12 +41,10 @@ def evaluate_expr(expr, env):
     except ValueError:
         pass
 
-    # Array evaluation
     if expr.startswith('[') and expr.endswith(']'):
         items = expr[1:-1].split(',')
         return [evaluate_expr(item, env) for item in items if item.strip()]
 
-    # Built-in helpers
     len_match = re.match(r"^length\((.*?)\)$", expr, re.IGNORECASE)
     if len_match:
         target = evaluate_expr(len_match.group(1), env)
@@ -111,7 +110,6 @@ def run_ast(lines, env):
             continue
 
         try:
-            # 1. Module Import
             import_match = re.match(r"^Mama\s+import\s+(.*)$", line, re.IGNORECASE)
             if import_match:
                 imp_file = evaluate_expr(import_match.group(1).strip(), env)
@@ -124,7 +122,6 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 2. Web Data Fetching
             if "mama fetch" in line.lower():
                 target_var = line.split("=")[0].replace("Mama keep", "").strip() if "=" in line else None
                 url_expr = line[line.lower().find("mama fetch") + 10:].strip()
@@ -143,7 +140,6 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 3. Output
             if line.lower().startswith("mama say"):
                 content = line[8:].strip()
                 res = evaluate_expr(content, env)
@@ -151,7 +147,6 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 4. File Operations
             write_match = re.match(r"^Mama\s+write\s+(.*?)\s*=\s*(.*)$", line, re.IGNORECASE)
             if write_match:
                 fname = evaluate_expr(write_match.group(1).strip(), env)
@@ -177,7 +172,6 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 5. Loops
             foreach_match = re.match(r"^Mama\s+repeat\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if foreach_match:
                 item_var = foreach_match.group(1).strip()
@@ -201,7 +195,6 @@ def run_ast(lines, env):
                 i = next_i
                 continue
 
-            # 6. Variable Storage
             keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
             if keep_match:
                 var_name = keep_match.group(1).strip()
@@ -210,7 +203,6 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
-            # 7. Functions
             func_match = re.match(r"^Mama\s+do\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)\s*:\s*$", line, re.IGNORECASE)
             if func_match:
                 func_name = func_match.group(1).strip()
@@ -246,7 +238,6 @@ def run_ast(lines, env):
                         i += 1
                         continue
 
-            # 8. Conditionals
             check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if check_match:
                 cond_expr = check_match.group(1).strip()
@@ -283,23 +274,26 @@ def run_mama_file(filename):
         print(f"Mama Error: File '{filename}' not found!")
 
 def start_repl():
-    print("🚀 Welcome to Mama Language Interactive Shell (v1.0.0)")
-    print("Type your Mama commands below. Type 'exit' to quit.\n")
+    print(f"🚀 Welcome to Mama Language REPL (v{VERSION})")
+    print("Type your Mama commands below. Type 'exit' or 'quit' to exit.\n")
     global_env = Environment()
     while True:
         try:
             line = input("mama > ")
             if line.strip().lower() in ["exit", "quit"]:
+                print("Abar dekha hobe, Mama!")
                 break
             if line.strip():
                 run_ast([line], global_env)
         except (KeyboardInterrupt, EOFError):
-            print("\nBye Mama!")
+            print("\nAbar dekha hobe, Mama!")
             break
 
 def main():
     if len(sys.argv) < 2:
         start_repl()
+    elif sys.argv[1] in ["--version", "-v"]:
+        print(f"Mama Language v{VERSION}")
     else:
         run_mama_file(sys.argv[1])
 
