@@ -2,10 +2,12 @@ import sys
 import re
 import os
 import urllib.request
+import math
+import random
+import time
+import json
 
-VERSION = "1.0.1"
-
-global_scope = {}
+VERSION = "2.0.0"
 
 class Environment:
     def __init__(self, parent=None):
@@ -41,16 +43,55 @@ def evaluate_expr(expr, env):
     except ValueError:
         pass
 
-    if expr.startswith('[') and expr.endswith(']'):
-        items = expr[1:-1].split(',')
-        return [evaluate_expr(item, env) for item in items if item.strip()]
+    # JSON Object / Dictionary evaluation
+    if expr.startswith('{') and expr.endswith('}'):
+        try:
+            return json.loads(expr)
+        except Exception:
+            pass
 
+    # Array evaluation
+    if expr.startswith('[') and expr.endswith(']'):
+        try:
+            items = expr[1:-1].split(',')
+            return [evaluate_expr(item, env) for item in items if item.strip()]
+        except Exception:
+            pass
+
+    # Built-in Helpers
     len_match = re.match(r"^length\((.*?)\)$", expr, re.IGNORECASE)
     if len_match:
         target = evaluate_expr(len_match.group(1), env)
-        if isinstance(target, (list, str)):
+        if isinstance(target, (list, str, dict)):
             return len(target)
         return 0
+
+    rand_match = re.match(r"^random\((.*?),(.*?)\)$", expr, re.IGNORECASE)
+    if rand_match:
+        low = int(evaluate_expr(rand_match.group(1), env))
+        high = int(evaluate_expr(rand_match.group(2), env))
+        return random.randint(low, high)
+
+    sqrt_match = re.match(r"^sqrt\((.*?)\)$", expr, re.IGNORECASE)
+    if sqrt_match:
+        val = float(evaluate_expr(sqrt_match.group(1), env))
+        return math.sqrt(val)
+
+    sleep_match = re.match(r"^sleep\((.*?)\)$", expr, re.IGNORECASE)
+    if sleep_match:
+        sec = float(evaluate_expr(sleep_match.group(1), env))
+        time.sleep(sec)
+        return None
+
+    push_match = re.match(r"^push\((.*?),(.*?)\)$", expr, re.IGNORECASE)
+    if push_match:
+        target_name = push_match.group(1).strip()
+        item_val = evaluate_expr(push_match.group(2).strip(), env)
+        arr = env.get(target_name)
+        if isinstance(arr, list):
+            arr.append(item_val)
+            env.set(target_name, arr)
+            return arr
 
     eval_str = expr
     eval_str = re.sub(r'\band\b', ' and ', eval_str, flags=re.IGNORECASE)
@@ -71,7 +112,7 @@ def evaluate_expr(expr, env):
         return val if val is not None else expr
 
 def mama_ai_guard(line, line_num, err_details=""):
-    print(f"\n🚨 [Mama AI Guard Alert on Line {line_num}]")
+    print(f"\n🚨 [Mama AI Guard v2.0 Alert on Line {line_num}]")
     print(f"--> Code: '{line.strip()}'")
     clean = line.strip().lower()
 
@@ -79,8 +120,10 @@ def mama_ai_guard(line, line_num, err_details=""):
         print("💡 Suggestion: Provide file name in quotes, e.g., Mama import 'helper.mama'")
     elif clean.startswith("mama fetch") and not (clean.endswith("'") or clean.endswith('"')):
         print("💡 Suggestion: Provide URL in quotes, e.g., Mama fetch 'https://api.example.com'")
+    elif clean.startswith("mama system") and not (clean.endswith("'") or clean.endswith('"')):
+        print("💡 Suggestion: Pass terminal commands in quotes, e.g., Mama system 'ls'")
     else:
-        print(f"💡 Suggestion: Check syntax or logic. Details: {err_details}")
+        print(f"💡 Suggestion: Syntax check failed. Details: {err_details}")
 
 def extract_block(lines, start_index):
     block = []
@@ -110,6 +153,15 @@ def run_ast(lines, env):
             continue
 
         try:
+            # 1. System/Shell Commands Execution
+            if line.lower().startswith("mama system"):
+                cmd_expr = line[11:].strip()
+                cmd_val = str(evaluate_expr(cmd_expr, env))
+                os.system(cmd_val)
+                i += 1
+                continue
+
+            # 2. Module Import
             import_match = re.match(r"^Mama\s+import\s+(.*)$", line, re.IGNORECASE)
             if import_match:
                 imp_file = evaluate_expr(import_match.group(1).strip(), env)
@@ -122,6 +174,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
+            # 3. Web Fetching
             if "mama fetch" in line.lower():
                 target_var = line.split("=")[0].replace("Mama keep", "").strip() if "=" in line else None
                 url_expr = line[line.lower().find("mama fetch") + 10:].strip()
@@ -140,6 +193,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
+            # 4. Printing Output
             if line.lower().startswith("mama say"):
                 content = line[8:].strip()
                 res = evaluate_expr(content, env)
@@ -147,6 +201,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
+            # 5. File Read & Write
             write_match = re.match(r"^Mama\s+write\s+(.*?)\s*=\s*(.*)$", line, re.IGNORECASE)
             if write_match:
                 fname = evaluate_expr(write_match.group(1).strip(), env)
@@ -172,6 +227,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
+            # 6. Loops
             foreach_match = re.match(r"^Mama\s+repeat\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if foreach_match:
                 item_var = foreach_match.group(1).strip()
@@ -195,6 +251,7 @@ def run_ast(lines, env):
                 i = next_i
                 continue
 
+            # 7. Variables Storage
             keep_match = re.match(r"^Mama\s+keep\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)$", line, re.IGNORECASE)
             if keep_match:
                 var_name = keep_match.group(1).strip()
@@ -203,6 +260,7 @@ def run_ast(lines, env):
                 i += 1
                 continue
 
+            # 8. Functions
             func_match = re.match(r"^Mama\s+do\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\((.*?)\)\s*:\s*$", line, re.IGNORECASE)
             if func_match:
                 func_name = func_match.group(1).strip()
@@ -238,6 +296,7 @@ def run_ast(lines, env):
                         i += 1
                         continue
 
+            # 9. Conditionals
             check_match = re.match(r"^Mama\s+check\s+(.*?)\s*:\s*$", line, re.IGNORECASE)
             if check_match:
                 cond_expr = check_match.group(1).strip()
@@ -273,13 +332,37 @@ def run_mama_file(filename):
     except FileNotFoundError:
         print(f"Mama Error: File '{filename}' not found!")
 
+def init_new_project():
+    sample_code = """# Welcome to Mama Language v2.0
+Mama keep framework = 'Mama-Engine'
+Mama say 'Initializing ' + framework
+
+Mama system 'echo Executing System Command from Mama Code...'
+Mama say 'Random Key: ' + random(1000, 9999)
+"""
+    with open("main.mama", "w") as f:
+        f.write(sample_code)
+    print("🚀 Mama v2.0 Project Initialized! Starter file created: main.mama")
+
+def print_help():
+    print(f"""
+Mama Language CLI Manual (v{VERSION})
+---------------------------------------
+Usage:
+  mama                  Start interactive REPL shell
+  mama <file.mama>      Execute a Mama source file
+  mama init             Initialize a new Mama project
+  mama -v, --version    Show current version
+  mama help             Show this help menu
+""")
+
 def start_repl():
-    print(f"🚀 Welcome to Mama Language REPL (v{VERSION})")
-    print("Type your Mama commands below. Type 'exit' or 'quit' to exit.\n")
+    print(f"🔥 Mama Language v{VERSION} Major Release REPL")
+    print("Type commands below. Type 'exit' to quit.\n")
     global_env = Environment()
     while True:
         try:
-            line = input("mama > ")
+            line = input("mama v2.0 > ")
             if line.strip().lower() in ["exit", "quit"]:
                 print("Abar dekha hobe, Mama!")
                 break
@@ -294,6 +377,10 @@ def main():
         start_repl()
     elif sys.argv[1] in ["--version", "-v"]:
         print(f"Mama Language v{VERSION}")
+    elif sys.argv[1] == "init":
+        init_new_project()
+    elif sys.argv[1] == "help":
+        print_help()
     else:
         run_mama_file(sys.argv[1])
 
