@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="mama-lang",
-    version="1.0.0",
+    version="1.0.1",
     description="Mama Language - An intuitive Bengali keyword-based programming language interpreter",
     long_description=open("README.md").read() if os.path.exists("README.md") else "",
     long_description_content_type="text/markdown",
