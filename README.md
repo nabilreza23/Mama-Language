@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Mama Language (v1.0.0)
+# 🚀 Mama Language (v2.0.0)
 
 ***An intuitive, Bengali keyword-based interpreted programming language built with Python.***
 
